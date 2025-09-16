@@ -16,9 +16,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    serverComponentsExternalPackages: ['pg'],
-  },
+  serverExternalPackages: ['pg'],
   webpack: (config, { isServer, nextRuntime }) => {
     if (!isServer) {
       config.resolve.fallback = {

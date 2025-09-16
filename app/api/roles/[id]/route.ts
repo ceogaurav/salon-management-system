@@ -1,38 +1,66 @@
-// app/api/roles/[id]/route.ts - Individual role management API endpoints
+// app/api/roles/[id]/route.ts - Stub API for Clerk authentication
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { getRoleById, updateRole, deleteRole, logAuditEvent } from '@/lib/rbac'
-import { headers } from 'next/headers'
-import { getClientIP } from '@/lib/utils'
+import { auth } from '@clerk/nextjs/server'
 
-// GET /api/roles/[id] - Get role by ID
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context?: any) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const { userId } = await auth()
     
-    // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError || !session) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const roleId = params.id
-    const role = await getRoleById(roleId)
+    return NextResponse.json({ 
+      message: 'API endpoint available but not fully implemented in demo mode',
+      user: userId,
+      data: []
+    })
+  } catch (error) {
+    console.error('API Error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
 
-    if (!role) {
-      return NextResponse.json({ error: 'Role not found' }, { status: 404 })
+export async function PUT(request: NextRequest, context?: any) {
+  try {
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    return NextResponse.json({ role })
+    return NextResponse.json({ 
+      message: 'Role update not implemented in demo mode',
+      success: true
+    })
   } catch (error) {
-    console.error('Error fetching role:', error)
+    console.error('API Error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch role' },
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest, context?: any) {
+  try {
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    return NextResponse.json({ 
+      message: 'Role deletion not implemented in demo mode',
+      success: true
+    })
+  } catch (error) {
+    console.error('API Error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

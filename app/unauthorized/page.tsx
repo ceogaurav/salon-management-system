@@ -6,14 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, ArrowLeft, Home, Shield } from 'lucide-react'
-import { useUserPermissions } from '@/hooks/usePermissions'
-import { useSession } from 'next-auth/react'
+import { useUser } from '@clerk/nextjs'
 
 export default function UnauthorizedPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session } = useSession()
-  const { data: userPermissions = [] } = useUserPermissions()
+  const { user } = useUser()
 
   const requiredPermissions = searchParams.get('required')?.split(',') || []
   const attemptedPath = searchParams.get('attempted') || 'this resource'
@@ -106,43 +104,25 @@ export default function UnauthorizedPage() {
         </Card>
 
         {/* User Info Card */}
-        {session?.user && (
+        {user && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Your Account Information</CardTitle>
               <CardDescription>
-                Current user permissions and access level
+                Current user and organization details
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-600">User</p>
-                  <p className="text-lg">{session.user.name || session.user.email}</p>
+                  <p className="text-lg">{user.fullName || user.primaryEmailAddress?.emailAddress}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Permissions</p>
-                  <p className="text-lg">{userPermissions.length} permissions</p>
+                  <p className="text-sm font-medium text-gray-600">Organization</p>
+                  <p className="text-lg">{user.organizationMemberships?.[0]?.organization?.name || 'No organization'}</p>
                 </div>
               </div>
-
-              {userPermissions.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-2">Your Current Permissions</p>
-                  <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                    {userPermissions.slice(0, 20).map((permission) => (
-                      <Badge key={permission} variant="outline" className="text-xs">
-                        {getPermissionName(permission)}
-                      </Badge>
-                    ))}
-                    {userPermissions.length > 20 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{userPermissions.length - 20} more
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              )}
 
               <div className="pt-4 border-t">
                 <p className="text-sm text-gray-600">
