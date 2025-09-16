@@ -98,18 +98,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}      created_at: new Date().toISOString()
-    }
-
-    return NextResponse.json({ 
-      user: mockUser,
-      note: "Demo mode - user not actually created"
-    }, { status: 201 })
-  } catch (error) {
-    console.error('Error creating user:', error)
-    return NextResponse.json(
-      { error: 'Failed to create user' },
-      { status: 500 }
-    )
-  }
 }
