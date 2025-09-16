@@ -1,129 +1,130 @@
 import { NextResponse } from "next/server"
-import { withTenantAuth } from "@/lib/withTenantAuth"
-import { Redis } from "@upstash/redis"
+import { auth } from "@clerk/nextjs/server"
 
-const redis = process.env.KV_REST_API_URL
-  ? new Redis({
-      url: process.env.KV_REST_API_URL!,
-      token: process.env.KV_REST_API_TOKEN!,
-    })
-  : null
+export const dynamic = "force-dynamic" // Prevents build-time execution
 
 export async function POST(req: Request) {
-  return await withTenantAuth(async ({ sql, tenantId }, user) => {
-    try {
-      // Check user permissions (admin, owner, staff can create bookings)
-      if (!user.roles.some(role => ["admin", "owner", "staff"].includes(role))) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-      }
-
-      const {
-        customer_id,
-        service_id,
-        staff_id,
-        booking_date,
-        booking_time,
-        status = "confirmed",
-        notes = "",
-        amount = 0,
-      } = await req.json()
-
-      if (!customer_id || !service_id || !booking_date || !booking_time) {
-        return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-      }
-
-      const rows = await sql`
-        INSERT INTO bookings (
-          tenant_id, customer_id, service_id, staff_id, 
-          booking_date, booking_time, status, notes, amount
-        )
-        SELECT 
-          ${tenantId}, ${customer_id}, ${service_id}, ${staff_id}, 
-          ${booking_date}, ${booking_time}, ${status}, ${notes}, ${amount}
-        WHERE EXISTS (
-          SELECT 1 FROM customers WHERE id = ${customer_id} AND tenant_id = ${tenantId}
-        )
-        AND EXISTS (
-          SELECT 1 FROM services WHERE id = ${service_id} AND tenant_id = ${tenantId}
-        )
-        AND (
-          ${staff_id} IS NULL OR EXISTS (
-            SELECT 1 FROM staff WHERE id = ${staff_id} AND tenant_id = ${tenantId}
-          )
-        )
-        RETURNING 
-          id, tenant_id, customer_id, service_id, staff_id, 
-          booking_date, booking_time, status, notes, amount, created_at
-      `
-
-      if (!rows.length) {
-        return NextResponse.json({ 
-          error: "Invalid customer, service, or staff ID for this tenant" 
-        }, { status: 400 })
-      }
-
-      // Invalidate tenant-scoped caches
-      if (redis) {
-        await redis.del(`tenant:${tenantId}:bookings:list`)
-        await redis.del(`tenant:${tenantId}:dashboard:stats`)
-      }
-
-      return NextResponse.json({ success: true, booking: rows[0] }, { status: 201 })
-    } catch (error: any) {
-      console.error("[v0] Booking creation error:", error)
-
-      if (error instanceof Response) {
-        return error
-      }
-
-      return NextResponse.json({ error: error?.message || "Server error" }, { status: 500 })
+  try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-  })
+
+    const {
+      customer_id,
+      service_id,
+      staff_id,
+      booking_date,
+      booking_time,
+      status = "confirmed",
+      notes = "",
+      amount = 0,
+    } = await req.json()
+
+    if (!customer_id || !service_id || !booking_date || !booking_time) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+
+    // Mock booking creation for demo mode
+    const mockBooking = {
+      id: Date.now(),
+      tenant_id: orgId || 'demo-tenant',
+      customer_id,
+      service_id,
+      staff_id,
+      booking_date,
+      booking_time,
+      status,
+      notes,
+      amount,
+      created_at: new Date().toISOString(),
+      booking_number: `BK${Date.now().toString().slice(-6)}`
+    }
+
+    console.log("[BOOKINGS] Creating booking (demo mode):", mockBooking)
+
+    return NextResponse.json({
+      success: true,
+      booking: mockBooking,
+      note: "Demo mode - booking not persisted to database"
+    }, { status: 201 })
+  } catch (error: any) {
+    console.error("[v0] Booking creation error:", error)
+    return NextResponse.json({ error: error?.message || "Server error" }, { status: 500 })
+  }
 }
 
 export async function GET(req: Request) {
-  return await withTenantAuth(async ({ sql, tenantId }) => {
-    try {
-      // Try Redis cache first
-      if (redis) {
-        const cached = await redis.get(`tenant:${tenantId}:bookings:list`)
-        if (cached) {
-          return NextResponse.json({ bookings: cached })
-        }
-      }
-
-      const rows = await sql`
-        SELECT 
-          b.*, 
-          c.name as customer_name, 
-          s.name as service_name, 
-          st.name as staff_name
-        FROM bookings b
-        LEFT JOIN customers c 
-          ON b.customer_id = c.id AND c.tenant_id = ${tenantId}
-        LEFT JOIN services s 
-          ON b.service_id = s.id AND s.tenant_id = ${tenantId}
-        LEFT JOIN staff st 
-          ON b.staff_id = st.id AND st.tenant_id = ${tenantId}
-        WHERE b.tenant_id = ${tenantId}
-        ORDER BY b.booking_date DESC, b.booking_time DESC
-        LIMIT 100
-      `
-
-      // Cache for 5 minutes
-      if (redis) {
-        await redis.setex(`tenant:${tenantId}:bookings:list`, 300, rows)
-      }
-
-      return NextResponse.json({ bookings: rows })
-    } catch (error: any) {
-      console.error("[v0] Bookings fetch error:", error)
-
-      if (error instanceof Response) {
-        return error
-      }
-
-      return NextResponse.json({ error: error?.message || "Server error" }, { status: 500 })
+  try {
+    const { userId, orgId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-  })
+
+    // Mock bookings data for demo mode
+    const mockBookings = [
+      {
+        id: 1,
+        tenant_id: orgId || 'demo-tenant',
+        customer_id: 1,
+        service_id: 1,
+        staff_id: 1,
+        booking_date: '2025-01-16',
+        booking_time: '10:00',
+        status: 'confirmed',
+        notes: 'Regular customer',
+        amount: 75.00,
+        created_at: new Date().toISOString(),
+        booking_number: 'BK001234',
+        customer_name: 'Sarah Johnson',
+        service_name: 'Haircut',
+        staff_name: 'Alice Johnson'
+      },
+      {
+        id: 2,
+        tenant_id: orgId || 'demo-tenant',
+        customer_id: 2,
+        service_id: 2,
+        staff_id: 1,
+        booking_date: '2025-01-16',
+        booking_time: '14:30',
+        status: 'pending',
+        notes: 'First visit',
+        amount: 120.00,
+        created_at: new Date().toISOString(),
+        booking_number: 'BK001235',
+        customer_name: 'Mike Davis',
+        service_name: 'Hair Styling',
+        staff_name: 'Alice Johnson'
+      },
+      {
+        id: 3,
+        tenant_id: orgId || 'demo-tenant',
+        customer_id: 3,
+        service_id: 3,
+        staff_id: 2,
+        booking_date: '2025-01-17',
+        booking_time: '11:15',
+        status: 'confirmed',
+        notes: 'Anniversary special',
+        amount: 85.00,
+        created_at: new Date().toISOString(),
+        booking_number: 'BK001236',
+        customer_name: 'Emily Brown',
+        service_name: 'Manicure',
+        staff_name: 'Bob Smith'
+      }
+    ]
+
+    return NextResponse.json({
+      bookings: mockBookings,
+      tenantId: orgId || 'demo-tenant',
+      note: "Demo data - booking management integration pending"
+    })
+  } catch (error: any) {
+    console.error("[v0] Bookings fetch error:", error)
+    return NextResponse.json({ error: error?.message || "Server error" }, { status: 500 })
+  }
 }
