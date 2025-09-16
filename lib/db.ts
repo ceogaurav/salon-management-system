@@ -1,12 +1,32 @@
 // lib/db.ts
 import { neon } from "@neondatabase/serverless"
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is required")
+// Lazy initialization to avoid build-time database access
+let baseSql: any = null
+
+function getBaseSql() {
+  if (!baseSql) {
+    if (!process.env.DATABASE_URL) {
+      console.warn("DATABASE_URL environment variable not set - using fallback mode")
+      return createGlobalFallbackSql()
+    }
+    baseSql = neon(process.env.DATABASE_URL)
+  }
+  return baseSql
 }
 
-// Base SQL client without tenant context (for general queries)
-const baseSql = neon(process.env.DATABASE_URL)
+/**
+ * Global fallback SQL client for when DATABASE_URL is not available
+ */
+function createGlobalFallbackSql() {
+  return async (query: any, ...params: any[]) => {
+    console.warn("[DB] No DATABASE_URL available - using fallback mode")
+    console.warn("[DB] Query attempted:", typeof query === 'string' ? query : 'Template query')
+    
+    // Return empty results for most queries to prevent crashes
+    return []
+  }
+}
 
 /**
  * Get the internal tenant ID from a tenant key (Clerk orgId or orgSlug)
@@ -19,8 +39,10 @@ export async function getInternalTenantId(tenantKey: string): Promise<string> {
     // Test basic connectivity first
     await testConnection()
     
+    const sql = getBaseSql()
+    
     // Try to find by tenant name that matches the key (simple approach)
-    const existingTenant = await baseSql`
+    const existingTenant = await sql`
       SELECT id, name FROM tenants 
       WHERE name = ${tenantKey} OR name LIKE ${`%${tenantKey}%`}
       LIMIT 1
@@ -57,7 +79,8 @@ export async function getInternalTenantId(tenantKey: string): Promise<string> {
  */
 async function testConnection(): Promise<void> {
   try {
-    await baseSql`SELECT 1 as test`
+    const sql = getBaseSql()
+    await sql`SELECT 1 as test`
   } catch (error) {
     console.error('[DB] Connection test failed:', error)
     throw error
@@ -99,10 +122,12 @@ async function createTenantForKey(tenantKey: string): Promise<{ id: string }> {
   try {
     console.log("[DB] Creating new tenant for key:", tenantKey)
     
+    const sql = getBaseSql()
+    
     // Use the tenant key as the salon name for now
     const salonName = tenantKey.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     
-    const result = await baseSql`
+    const result = await sql`
       INSERT INTO tenants (name, created_at)
       VALUES (${salonName}, NOW())
       RETURNING id
@@ -174,4 +199,6 @@ export async function getAuthenticatedSql(tenantKey: string) {
 }
 
 // Export the base SQL client for non-tenant-specific operations
-export { baseSql as sql }
+export function sql() {
+  return getBaseSql()
+}

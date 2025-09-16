@@ -1,22 +1,50 @@
 // app/api/users/route.ts - User management API endpoints
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs'
-import { getAllUsers, createUser, logAuditEvent } from '@/lib/rbac'
-import { getClientIP } from '@/lib/utils'
+import { auth } from '@clerk/nextjs/server'
+
+export const dynamic = "force-dynamic" // Prevents build-time execution
 
 // GET /api/users - Get all users
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get all users
-    const users = await getAllUsers()
+    // Return mock users for demo
+    const mockUsers = [
+      {
+        id: '1',
+        name: 'Demo Admin',
+        email: 'admin@demo.com',
+        phone: '+1234567890',
+        role_id: '1',
+        role_name: 'Administrator',
+        department: 'Management',
+        employee_id: 'EMP001',
+        is_active: true,
+        created_at: new Date().toISOString()
+      },
+      {
+        id: '2',
+        name: 'Demo Staff',
+        email: 'staff@demo.com',
+        phone: '+0987654321',
+        role_id: '2',
+        role_name: 'Staff',
+        department: 'Operations',
+        employee_id: 'EMP002',
+        is_active: true,
+        created_at: new Date().toISOString()
+      }
+    ]
     
-    return NextResponse.json({ users })
+    return NextResponse.json({ 
+      users: mockUsers,
+      note: "Demo data - user management integration pending"
+    })
   } catch (error) {
     console.error('Error fetching users:', error)
     return NextResponse.json(
@@ -29,7 +57,7 @@ export async function GET(request: NextRequest) {
 // POST /api/users - Create new user
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -46,36 +74,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create user
-    const newUser = await createUser({
+    // Return mock created user
+    const mockUser = {
+      id: Date.now().toString(),
       name,
       email,
       phone,
       role_id,
       department,
       employee_id,
-      is_active
-    }, userId)
-
-    if (!newUser) {
-      return NextResponse.json(
-        { error: 'Failed to create user' },
-        { status: 500 }
-      )
+      is_active,
+      created_at: new Date().toISOString()
     }
 
-    // Log audit event
-    await logAuditEvent(
-      userId,
-      'user_created',
-      'user',
-      newUser.id,
-      { name, email, role_id },
-      getClientIP(request),
-      request.headers.get('user-agent') || undefined
+    return NextResponse.json({ 
+      user: mockUser,
+      note: "Demo mode - user not actually created"
+    }, { status: 201 })
+  } catch (error) {
+    console.error('Error creating user:', error)
+    return NextResponse.json(
+      { error: 'Failed to create user' },
+      { status: 500 }
     )
+  }
+}      created_at: new Date().toISOString()
+    }
 
-    return NextResponse.json({ user: newUser }, { status: 201 })
+    return NextResponse.json({ 
+      user: mockUser,
+      note: "Demo mode - user not actually created"
+    }, { status: 201 })
   } catch (error) {
     console.error('Error creating user:', error)
     return NextResponse.json(
