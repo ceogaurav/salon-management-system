@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Invoice Features</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 10px; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; }
+    </style>
+</head>
+<body>
+    <h1>Invoice Features Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Print Invoice Test</h2>
+        <p>Test the print functionality that should open a new window with PDF-ready HTML</p>
+        <button onclick="testPrintInvoice()">Test Print Invoice</button>
+        <div id="printResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. WhatsApp Share Test</h2>
+        <p>Test the WhatsApp share functionality with custom message template</p>
+        <button onclick="testWhatsAppShare()">Test WhatsApp Share</button>
+        <div id="shareResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Invoice Download API Test</h2>
+        <p>Test the individual invoice download endpoint</p>
+        <input type="text" id="invoiceId" placeholder="Enter Invoice ID (e.g., 1)" value="1">
+        <button onclick="testInvoiceDownload()">Test Download API</button>
+        <div id="downloadResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Test print functionality
+        async function testPrintInvoice() {
+            const result = document.getElementById('printResult');
+            result.style.display = 'block';
+            result.innerHTML = 'Testing print functionality...';
+            
+            // Simulate the print functionality from invoice screen
+            try {
+                const testInvoiceData = {
+                    invoiceNumber: "TEST-001",
+                    invoiceDate: new Date().toISOString(),
+                    customerName: "Test Customer",
+                    customerPhone: "9876543210",
+                    items: [{ 
+                        id: 1, 
+                        description: "Test Service", 
+                        quantity: 1, 
+                        rate: 500, 
+                        amount: 500 
+                    }],
+                    subtotal: 500,
+                    discount: 0,
+                    businessName: "Test Salon"
+                };
+                
+                const response = await fetch('/api/invoices/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ invoiceData: testInvoiceData })
+                });
+                
+                if (response.ok) {
+                    const apiResult = await response.json();
+                    if (apiResult.success && apiResult.htmlContent) {
+                        // Open in new window like print functionality
+                        const printWindow = window.open('', '_blank', 'width=800,height=600');
+                        printWindow.document.write(apiResult.htmlContent);
+                        printWindow.document.close();
+                        
+                        result.innerHTML = '✅ Print test successful! Check the new window opened.';
+                        result.style.borderLeftColor = '#28a745';
+                    } else {
+                        result.innerHTML = '❌ Print test failed: ' + (apiResult.message || 'Unknown error');
+                        result.style.borderLeftColor = '#dc3545';
+                    }
+                } else {
+                    result.innerHTML = '❌ Print test failed: HTTP ' + response.status;
+                    result.style.borderLeftColor = '#dc3545';
+                }
+            } catch (error) {
+                result.innerHTML = '❌ Print test error: ' + error.message;
+                result.style.borderLeftColor = '#dc3545';
+            }
+        }
+        
+        // Test WhatsApp share functionality
+        function testWhatsAppShare() {
+            const result = document.getElementById('shareResult');
+            result.style.display = 'block';
+            result.innerHTML = 'Testing WhatsApp share...';
+            
+            try {
+                // Simulate the WhatsApp share functionality
+                const customerName = "Test Customer";
+                const tenantName = "Test Salon";
+                const phoneNumber = "919876543210";
+                const invoiceDate = new Date();
+                const dateTime = invoiceDate.toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const invoiceDownloadLink = window.location.origin + '/api/invoices/1/download';
+                
+                const whatsappMessage = `Hi ${customerName},
+
+Your appointment at ${tenantName} on ${dateTime} is Completed.
+
+Please rate us on Google: https://maps.app.goo.gl/E5F1vmBfu7sBZj6BA?g_st=iw
+
+Here is your invoice: ${invoiceDownloadLink}
+
+Sincerely,
+The team at ${tenantName}`;
+                
+                const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+                
+                result.innerHTML = `✅ WhatsApp URL generated successfully!<br><br>
+                    <strong>Phone:</strong> ${phoneNumber}<br>
+                    <strong>Message Preview:</strong><br>
+                    <pre style="background: white; padding: 10px; margin: 10px 0; white-space: pre-wrap;">${whatsappMessage}</pre>
+                    <a href="${whatsappUrl}" target="_blank" style="color: #007bff;">Click to open WhatsApp</a>`;
+                result.style.borderLeftColor = '#28a745';
+                
+            } catch (error) {
+                result.innerHTML = '❌ WhatsApp test error: ' + error.message;
+                result.style.borderLeftColor = '#dc3545';
+            }
+        }
+        
+        // Test invoice download API
+        async function testInvoiceDownload() {
+            const result = document.getElementById('downloadResult');
+            const invoiceId = document.getElementById('invoiceId').value;
+            
+            if (!invoiceId) {
+                result.style.display = 'block';
+                result.innerHTML = '❌ Please enter an invoice ID';
+                result.style.borderLeftColor = '#dc3545';
+                return;
+            }
+            
+            result.style.display = 'block';
+            result.innerHTML = 'Testing download API...';
+            
+            try {
+                const downloadUrl = `/api/invoices/${invoiceId}/download`;
+                const response = await fetch(downloadUrl);
+                
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('text/html')) {
+                        result.innerHTML = `✅ Download API test successful!<br>
+                            <strong>Status:</strong> ${response.status}<br>
+                            <strong>Content-Type:</strong> ${contentType}<br>
+                            <a href="${downloadUrl}" target="_blank" style="color: #007bff;">Open Invoice in New Tab</a>`;
+                        result.style.borderLeftColor = '#28a745';
+                    } else {
+                        const text = await response.text();
+                        result.innerHTML = `⚠️ Unexpected response type: ${contentType}<br>Response: ${text}`;
+                        result.style.borderLeftColor = '#ffc107';
+                    }
+                } else {
+                    const text = await response.text();
+                    result.innerHTML = `❌ Download API failed: HTTP ${response.status}<br>Response: ${text}`;
+                    result.style.borderLeftColor = '#dc3545';
+                }
+            } catch (error) {
+                result.innerHTML = '❌ Download API error: ' + error.message;
+                result.style.borderLeftColor = '#dc3545';
+            }
+        }
+    </script>
+</body>
+</html>
